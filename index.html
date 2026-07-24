@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>مدار کد</title>
+<title> Void Code </title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -23,10 +23,16 @@
       </svg>
       <h1>مدار کد</h1>
     </div>
-    <button class="run-btn" id="runBtn">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-      اجرا
-    </button>
+    <div class="actions">
+      <button class="cancel-btn" id="cancelBtn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+        لغو اجرا
+      </button>
+      <button class="run-btn" id="runBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        اجرا
+      </button>
+    </div>
   </div>
 
   <div class="layout">
@@ -44,7 +50,7 @@
       <button class="rail-tab" data-lang="python">
         <span class="dot" id="dot-python"></span> Python
       </button>
-      <p class="rail-note">هر بار که «اجرا» رو می‌زنی، مدار چک می‌شه. اگه یه جای کد قطعی داشته باشه، همون بخش قرمز می‌شه.</p>
+      <p class="rail-note">بالای پنل خروجی رو بکش تا فاصله‌ی ادیتور و نمایشگر عوض بشه. با «لغو اجرا» می‌تونی وسط کار متوقف کنی و کد جدید رو امتحان کنی.</p>
     </div>
 
     <div class="workspace">
@@ -91,7 +97,11 @@ for i in range(5):
         </div>
       </div>
 
-      <div class="divider" id="divider"></div>
+      <div class="divider" id="divider">
+        <button class="resize-step-btn" id="growOutputBtn" type="button" title="بزرگ‌تر کردن نمایشگر" aria-label="بزرگ‌تر کردن نمایشگر">▲</button>
+        <div class="divider-hit" id="dividerHit"></div>
+        <button class="resize-step-btn" id="shrinkOutputBtn" type="button" title="بزرگ‌تر کردن ادیتور" aria-label="بزرگ‌تر کردن ادیتور">▼</button>
+      </div>
 
       <div class="output-region">
         <div class="output-header">
@@ -101,9 +111,7 @@ for i in range(5):
           <button class="icon-btn" id="openWindowBtn" disabled>باز کردن در پنجره جدید</button>
         </div>
         <div class="output-body">
-          <div class="placeholder" id="placeholder">
-            کد رو بنویس، بعد دکمه <strong>▶ اجرا</strong> رو بزن تا وضعیت مدار رو ببینی.
-          </div>
+          <div class="placeholder" id="placeholder"></div>
           <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-modals allow-forms"></iframe>
           <div class="console-box" id="consoleBox"></div>
           <div class="error-list" id="errorList"></div>

@@ -22,10 +22,17 @@ var consoleBox = document.getElementById('consoleBox');
 var errorList = document.getElementById('errorList');
 var openWindowBtn = document.getElementById('openWindowBtn');
 var runBtn = document.getElementById('runBtn');
+var cancelBtn = document.getElementById('cancelBtn');
 var divider = document.getElementById('divider');
 
 var currentLang = 'html';
 var lastGoodWebDoc = null;
+var webIsLive = false;
+var pythonIsPending = false;
+var runToken = 0;
+
+var DEFAULT_PLACEHOLDER_HTML = 'کد رو بنویس، بعد دکمه <strong>▶ اجرا</strong> رو بزن تا وضعیت مدار رو ببینی.';
+var CANCELLED_PLACEHOLDER_HTML = 'اجرا لغو شد. کد جدید رو بنویس و دوباره <strong>▶ اجرا</strong> رو بزن.';
 
 /* ============================================================
    تعویض تب‌ها
@@ -39,7 +46,8 @@ railTabs.forEach(function (tab) {
     currentLang = tab.dataset.lang;
     editorPanes[currentLang].classList.add('active');
 
-    openWindowBtn.disabled = !(currentLang !== 'python' && lastGoodWebDoc);
+    syncOpenWindowBtn();
+    updateCancelVisibility();
   });
 });
 
@@ -169,10 +177,20 @@ function setStatusLabel(text, state) {
   setDot('status', state);
 }
 
-function showPlaceholderView() {
+function syncOpenWindowBtn() {
+  openWindowBtn.disabled = !(currentLang !== 'python' && lastGoodWebDoc);
+}
+
+function updateCancelVisibility() {
+  var shouldShow = (currentLang === 'python') ? pythonIsPending : webIsLive;
+  cancelBtn.classList.toggle('visible', !!shouldShow);
+}
+
+function showPlaceholderView(html) {
   hideAllOutputViews();
+  placeholder.innerHTML = html || DEFAULT_PLACEHOLDER_HTML;
   placeholder.style.display = 'flex';
-  openWindowBtn.disabled = true;
+  syncOpenWindowBtn();
 }
 
 function showPreviewView(docString) {
@@ -180,13 +198,14 @@ function showPreviewView(docString) {
   previewFrame.style.display = 'block';
   previewFrame.srcdoc = docString;
   lastGoodWebDoc = docString;
-  openWindowBtn.disabled = false;
+  syncOpenWindowBtn();
 }
 
 function showConsoleView(text) {
   hideAllOutputViews();
   consoleBox.style.display = 'block';
   consoleBox.textContent = text;
+  syncOpenWindowBtn();
 }
 
 function showErrorsView(problems) {
@@ -208,7 +227,7 @@ function showErrorsView(problems) {
 
     errorList.appendChild(card);
   });
-  openWindowBtn.disabled = true;
+  syncOpenWindowBtn();
 }
 
 /* ============================================================
@@ -243,19 +262,39 @@ function buildWebDocString(html, css, js) {
 }
 
 window.addEventListener('message', function (e) {
-  if (e.data && e.data.type === 'runtime-error') {
+  if (e.data && e.data.type === 'runtime-error' && webIsLive) {
     setDot('js', 'trip');
+    setStatusLabel('قطعی توی مدار پیدا شد', 'trip');
+    webIsLive = false;
     showErrorsView([{
       section: 'JavaScript (هنگام اجرا)',
       message: e.data.msg
     }]);
+    updateCancelVisibility();
   }
 });
+
+/* ============================================================
+   بازسازی iframe پیش‌نمایش از صفر.
+   این کار هر تایمر، صدا، یا رویدادِ در حال اجرا در پیش‌نمایش
+   قبلی را کاملاً متوقف می‌کند (چون کل زمینه‌ی مرورگرِ آن
+   iframe از بین می‌رود)، پیش از هر اجرای جدید یا لغو.
+   ============================================================ */
+function resetPreviewFrame() {
+  var fresh = document.createElement('iframe');
+  fresh.id = 'previewFrame';
+  fresh.className = 'preview-frame';
+  fresh.setAttribute('sandbox', 'allow-scripts allow-modals allow-forms');
+  previewFrame.replaceWith(fresh);
+  previewFrame = fresh;
+}
 
 /* ============================================================
    اجرای HTML/CSS/JS
    ============================================================ */
 function runWeb() {
+  resetPreviewFrame();
+
   var html = document.getElementById('editor-html').value;
   var css = document.getElementById('editor-css').value;
   var js = document.getElementById('editor-js').value;
@@ -274,13 +313,28 @@ function runWeb() {
   if (!jsResult.ok) problems.push({ section: 'JavaScript', message: jsResult.message });
 
   if (problems.length > 0) {
+    webIsLive = false;
     setStatusLabel('قطعی توی مدار پیدا شد', 'trip');
     showErrorsView(problems);
+    updateCancelVisibility();
     return;
   }
 
+  webIsLive = true;
   setStatusLabel('مدار وصله — همه‌چی درست کار می‌کنه', 'live');
   showPreviewView(buildWebDocString(html, css, js));
+  updateCancelVisibility();
+}
+
+function cancelWeb() {
+  resetPreviewFrame();
+  webIsLive = false;
+  setDot('html', null);
+  setDot('css', null);
+  setDot('js', null);
+  setStatusLabel('لغو شد — آماده‌ی اجرای جدید', null);
+  showPlaceholderView(CANCELLED_PLACEHOLDER_HTML);
+  updateCancelVisibility();
 }
 
 openWindowBtn.addEventListener('click', function () {
@@ -314,7 +368,6 @@ function ensurePyodide() {
   if (pyodideInstance) return Promise.resolve(pyodideInstance);
   if (pyodideLoadPromise) return pyodideLoadPromise;
 
-  setStatusLabel('در حال بارگذاری پایتون (فقط بار اول)...', null);
   showConsoleView('در حال بارگذاری پایتون... چند ثانیه صبر کن.');
 
   pyodideLoadPromise = ensurePyodideScriptTag()
@@ -333,30 +386,55 @@ function ensurePyodide() {
 
 function runPython() {
   var code = document.getElementById('editor-python').value;
+  var myToken = ++runToken;
+
+  pythonIsPending = true;
+  setStatusLabel('در حال اجرا...', null);
+  updateCancelVisibility();
 
   ensurePyodide().then(function (py) {
+    if (myToken !== runToken) return;
+
     var output = '';
     py.setStdout({ batched: function (s) { output += s + '\n'; } });
     py.setStderr({ batched: function (s) { output += s + '\n'; } });
 
     return py.runPythonAsync(code).then(function () {
+      if (myToken !== runToken) return;
+      pythonIsPending = false;
       setDot('python', 'live');
       setStatusLabel('مدار وصله — کد درست اجرا شد', 'live');
       showConsoleView(output || '(کد اجرا شد ولی هیچ چیزی چاپ نکرد)');
+      updateCancelVisibility();
     }, function (err) {
+      if (myToken !== runToken) return;
+      pythonIsPending = false;
       setDot('python', 'trip');
       setStatusLabel('قطعی توی مدار پیدا شد', 'trip');
       showErrorsView([{ section: 'Python', message: err.message }]);
+      updateCancelVisibility();
     });
   }).catch(function (err) {
+    if (myToken !== runToken) return;
+    pythonIsPending = false;
     setDot('python', 'trip');
     setStatusLabel('قطعی توی مدار پیدا شد', 'trip');
     showErrorsView([{ section: 'Python', message: err.message }]);
+    updateCancelVisibility();
   });
 }
 
+function cancelPython() {
+  runToken++;
+  pythonIsPending = false;
+  setDot('python', null);
+  setStatusLabel('لغو شد — آماده‌ی اجرای جدید', null);
+  showPlaceholderView(CANCELLED_PLACEHOLDER_HTML);
+  updateCancelVisibility();
+}
+
 /* ============================================================
-   دکمه اجرا
+   دکمه‌های اجرا و لغو
    ============================================================ */
 runBtn.addEventListener('click', function () {
   if (currentLang === 'python') {
@@ -366,36 +444,89 @@ runBtn.addEventListener('click', function () {
   }
 });
 
+cancelBtn.addEventListener('click', function () {
+  if (currentLang === 'python') {
+    cancelPython();
+  } else {
+    cancelWeb();
+  }
+});
+
 /* ============================================================
-   تغییر اندازه با کشیدن خط جداکننده
+   تغییر اندازه‌ی پنل خروجی: هم با کشیدن، هم با دو دکمه‌ی پله‌ای
+   (دکمه‌ها همیشه کار می‌کنند، چون فقط یک تپ ساده‌اند و به هیچ
+   ژست خاصی وابسته نیستند — پشتیبان مطمئن برای کشیدن)
    ============================================================ */
 (function () {
   var outputRegion = document.querySelector('.output-region');
   var workspace = document.querySelector('.workspace');
-  var dragging = false;
+  var dividerHit = document.getElementById('dividerHit');
+  var growBtn = document.getElementById('growOutputBtn');
+  var shrinkBtn = document.getElementById('shrinkOutputBtn');
+  var RESIZE_STEP = 70;
 
-  divider.addEventListener('mousedown', function () {
-    dragging = true;
-    document.body.style.userSelect = 'none';
-  });
-
-  window.addEventListener('mouseup', function () {
-    dragging = false;
-    document.body.style.userSelect = '';
-  });
-
-  window.addEventListener('mousemove', function (e) {
-    if (!dragging) return;
+  function clampHeight(px) {
     var rect = workspace.getBoundingClientRect();
-    var newHeight = rect.bottom - e.clientY;
     var min = 90;
     var max = rect.height - 140;
-    newHeight = Math.max(min, Math.min(max, newHeight));
-    outputRegion.style.flexBasis = newHeight + 'px';
+    return Math.max(min, Math.min(max, px));
+  }
+
+  function setHeightFromPointerY(clientY) {
+    var rect = workspace.getBoundingClientRect();
+    outputRegion.style.flexBasis = clampHeight(rect.bottom - clientY) + 'px';
+  }
+
+  function stepHeight(delta) {
+    var current = outputRegion.getBoundingClientRect().height;
+    outputRegion.style.flexBasis = clampHeight(current + delta) + 'px';
+  }
+
+  growBtn.addEventListener('click', function () { stepHeight(RESIZE_STEP); });
+  shrinkBtn.addEventListener('click', function () { stepHeight(-RESIZE_STEP); });
+
+  /* Pointer Events: مسیر اصلی برای ماوس، قلم و بیشتر مرورگرهای لمسی */
+  dividerHit.addEventListener('pointerdown', function (e) {
+    dividerHit.setPointerCapture(e.pointerId);
+    divider.classList.add('dragging');
   });
+
+  dividerHit.addEventListener('pointermove', function (e) {
+    if (!dividerHit.hasPointerCapture(e.pointerId)) return;
+    setHeightFromPointerY(e.clientY);
+  });
+
+  function endPointerDrag(e) {
+    if (dividerHit.hasPointerCapture(e.pointerId)) {
+      dividerHit.releasePointerCapture(e.pointerId);
+    }
+    divider.classList.remove('dragging');
+  }
+
+  dividerHit.addEventListener('pointerup', endPointerDrag);
+  dividerHit.addEventListener('pointercancel', endPointerDrag);
+
+  /* Touch Events: پشتیبان صریح برای مرورگرهای/وب‌ویوهایی که
+     Pointer Events یا touch-action را کامل رعایت نمی‌کنند */
+  dividerHit.addEventListener('touchstart', function (e) {
+    divider.classList.add('dragging');
+    e.preventDefault();
+  }, { passive: false });
+
+  dividerHit.addEventListener('touchmove', function (e) {
+    if (!e.touches || !e.touches[0]) return;
+    setHeightFromPointerY(e.touches[0].clientY);
+    e.preventDefault();
+  }, { passive: false });
+
+  function endTouchDrag() { divider.classList.remove('dragging'); }
+  dividerHit.addEventListener('touchend', endTouchDrag);
+  dividerHit.addEventListener('touchcancel', endTouchDrag);
 })();
 
 /* ============================================================
    حالت اولیه: هیچ اجرایی خودکار انجام نمی‌شود
    ============================================================ */
 showPlaceholderView();
+syncOpenWindowBtn();
+updateCancelVisibility();

@@ -37,6 +37,7 @@ function tokenize(code, rules) {
 
 var JS_KEYWORDS = 'var|let|const|function|return|if|else|for|while|do|break|continue|switch|case|default|try|catch|finally|throw|new|delete|typeof|instanceof|in|of|class|extends|super|this|null|undefined|true|false|async|await|yield|import|export|from|as|static|get|set';
 var PY_KEYWORDS = 'def|return|if|elif|else|for|while|break|continue|pass|import|from|as|class|try|except|finally|raise|with|lambda|yield|global|nonlocal|del|assert|True|False|None|and|or|not|in|is|async|await';
+var PHP_KEYWORDS = 'abstract|and|array|as|break|callable|case|catch|class|clone|const|continue|declare|default|do|echo|else|elseif|empty|enddeclare|endfor|endforeach|endif|endswitch|endwhile|extends|final|finally|fn|for|foreach|function|global|goto|if|implements|include|include_once|instanceof|insteadof|interface|isset|list|match|namespace|new|or|print|private|protected|public|require|require_once|return|static|switch|throw|trait|try|unset|use|var|while|xor|yield|true|false|null|self|parent';
 
 var VOID_ELEMENTS = {
   area: 1, base: 1, br: 1, col: 1, embed: 1, hr: 1, img: 1,
@@ -77,6 +78,25 @@ var RULES = {
     { type: 'keyword', regex: new RegExp('\\b(?:' + PY_KEYWORDS + ')\\b', 'y') },
     { type: 'punctuation', regex: /[(){}\[\]:,.]/y },
     { type: 'operator', regex: /[+\-*/%=<>!&|^~]+/y }
+  ],
+  php: [
+    { type: 'comment', regex: /\/\*[\s\S]*?\*\/|\/\/[^\n]*|#[^\n]*/y },
+    { type: 'string', regex: /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/y },
+    { type: 'variable', regex: /\$[a-zA-Z_][a-zA-Z0-9_]*/y },
+    { type: 'number', regex: /\b(?:0[xX][0-9a-fA-F]+|\d+\.?\d*(?:[eE][+-]?\d+)?)\b/y },
+    { type: 'keyword', regex: new RegExp('\\b(?:' + PHP_KEYWORDS + ')\\b', 'iy') },
+    { type: 'punctuation', regex: /[(){}\[\];,.]/y },
+    { type: 'operator', regex: /[+\-*/%=<>!&|^~?:.]+/y }
+  ],
+  yaml: [
+    { type: 'comment', regex: /#[^\n]*/y },
+    { type: 'string', regex: /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/y },
+    { type: 'anchor', regex: /[&*][a-zA-Z_][a-zA-Z0-9_-]*/y },
+    { type: 'punctuation', regex: /---|\.\.\./y },
+    { type: 'number', regex: /-?\b\d+\.?\d*\b/y },
+    { type: 'keyword', regex: /\b(?:true|false|null|yes|no|on|off|True|False|Null|Yes|No|On|Off|TRUE|FALSE|NULL|YES|NO|ON|OFF)\b/y },
+    { type: 'key', regex: /[a-zA-Z_][a-zA-Z0-9_-]*(?=\s*:(\s|$))/y },
+    { type: 'punctuation', regex: /[:\[\]{},\-]/y }
   ]
 };
 
@@ -95,9 +115,89 @@ function renderTokens(tokens) {
 }
 
 function highlight(code, lang) {
+  if (lang === 'php') return renderTokens(tokenizePhp(code));
   var rules = RULES[lang];
   if (!rules) return escapeHtml(code);
   return renderTokens(tokenize(code, rules));
+}
+
+/* ============================================================
+   PHP دو حالته: بیرون از <?php ?> یعنی HTML، داخلش یعنی PHP
+   ============================================================ */
+function matchPhpOpenTagAt(code, idx) {
+  if (code.slice(idx, idx + 5).toLowerCase() === '<?php') return code.slice(idx, idx + 5);
+  if (code.slice(idx, idx + 3) === '<?=') return '<?=';
+  return null;
+}
+
+function findNextPhpOpenTag(code, from) {
+  var phpIdx = code.toLowerCase().indexOf('<?php', from);
+  var echoIdx = code.indexOf('<?=', from);
+  if (phpIdx === -1 && echoIdx === -1) return -1;
+  if (phpIdx === -1) return echoIdx;
+  if (echoIdx === -1) return phpIdx;
+  return Math.min(phpIdx, echoIdx);
+}
+
+function tokenizePhpStateful(code, startInPhp) {
+  var tokens = [];
+  var i = 0;
+  var n = code.length;
+  var inPhp = !!startInPhp;
+
+  while (i < n) {
+    if (!inPhp) {
+      var openIdx = findNextPhpOpenTag(code, i);
+      if (openIdx === -1) {
+        tokens = tokens.concat(tokenize(code.slice(i), RULES.html));
+        i = n;
+      } else {
+        if (openIdx > i) tokens = tokens.concat(tokenize(code.slice(i, openIdx), RULES.html));
+        var openTagText = matchPhpOpenTagAt(code, openIdx);
+        tokens.push({ type: 'phptag', text: openTagText });
+        i = openIdx + openTagText.length;
+        inPhp = true;
+      }
+    } else {
+      var closeIdx = code.indexOf('?>', i);
+      if (closeIdx === -1) {
+        tokens = tokens.concat(tokenize(code.slice(i), RULES.php));
+        i = n;
+      } else {
+        if (closeIdx > i) tokens = tokens.concat(tokenize(code.slice(i, closeIdx), RULES.php));
+        tokens.push({ type: 'phptag', text: '?>' });
+        i = closeIdx + 2;
+        inPhp = false;
+      }
+    }
+  }
+  return { tokens: tokens, endInPhp: inPhp };
+}
+
+function tokenizePhp(code) {
+  return tokenizePhpStateful(code, false).tokens;
+}
+
+/* استخراج فقط بخش‌های PHP (بدون خودِ تگ‌ها) — برای اعتبارسنجی در script.js */
+function extractPhpCode(code) {
+  var result = '';
+  var i = 0, n = code.length, inPhp = false;
+  while (i < n) {
+    if (!inPhp) {
+      var openIdx = findNextPhpOpenTag(code, i);
+      if (openIdx === -1) { i = n; }
+      else {
+        var openTagText = matchPhpOpenTagAt(code, openIdx);
+        i = openIdx + openTagText.length;
+        inPhp = true;
+      }
+    } else {
+      var closeIdx = code.indexOf('?>', i);
+      if (closeIdx === -1) { result += code.slice(i); i = n; }
+      else { result += code.slice(i, closeIdx); i = closeIdx + 2; inPhp = false; }
+    }
+  }
+  return result;
 }
 
 /* ============================================================
@@ -172,9 +272,43 @@ function reformatHtml(code) {
   return out.join('\n');
 }
 
+function reformatPhp(code) {
+  var lines = code.split('\n');
+  var depth = 0;
+  var inPhp = false;
+  var out = [];
+
+  for (var li = 0; li < lines.length; li++) {
+    var trimmed = lines[li].replace(/^[ \t]+/, '').replace(/[ \t]+$/, '');
+    if (trimmed === '') { out.push(''); continue; }
+
+    var startsWithCloser = /^[}\)\]]/.test(trimmed);
+    var thisDepth = startsWithCloser ? Math.max(0, depth - 1) : depth;
+    out.push(repeatStr('  ', thisDepth) + trimmed);
+
+    var result = tokenizePhpStateful(trimmed, inPhp);
+    inPhp = result.endInPhp;
+
+    var net = 0;
+    for (var ti = 0; ti < result.tokens.length; ti++) {
+      var t = result.tokens[ti];
+      if (t.type === 'punctuation') {
+        if (t.text === '{' || t.text === '(' || t.text === '[') net++;
+        else if (t.text === '}' || t.text === ')' || t.text === ']') net--;
+      }
+    }
+    depth = Math.max(0, depth + net);
+  }
+
+  return out.join('\n');
+}
+
 function reformat(code, lang) {
   if (lang === 'html') return reformatHtml(code);
   if (lang === 'css' || lang === 'js') return reformatBraces(code, lang);
+  if (lang === 'php') return reformatPhp(code);
+  /* yaml عمداً فرمت نمی‌شه: فاصله‌گذاری در YAML معنی‌داره و تغییر
+     خودکارش می‌تونه ساختار درست کاربر رو بی‌سروصدا خراب کنه. */
   return code;
 }
 
@@ -357,15 +491,20 @@ var DEFAULT_CODE = {
   html: '<h1>سلام دنیا!</h1>\n<p>این یک متن نمونه\u200cست.</p>\n<button onclick="sayHi()">کلیک کن</button>',
   css: 'body {\n  font-family: sans-serif;\n  background: #f4f4fb;\n  color: #22223b;\n  padding: 24px;\n  text-align: center;\n}\nh1 { color: #e8a33d; }\nbutton {\n  background: #e8a33d;\n  color: #1a1305;\n  border: none;\n  padding: 10px 20px;\n  border-radius: 6px;\n  cursor: pointer;\n  font-weight: bold;\n}',
   js: 'function sayHi() {\n  alert("سلام! این پیام از جاوااسکریپت اومد.");\n}\nconsole.log("صفحه لود شد");',
-  python: 'print("سلام دنیا از پایتون!")\n\nfor i in range(5):\n    print("i =", i)'
+  python: 'print("سلام دنیا از پایتون!")\n\nfor i in range(5):\n    print("i =", i)',
+  php: '<?php\n$players = ["علی" => 10, "سارا" => 8];\n\nforeach ($players as $name => $score) {\n    echo $name . ": " . $score . "\\n";\n}\n?>',
+  yaml: 'player:\n  name: علی\n  score: 10\n  skills:\n    - php\n    - python\n    - javascript'
 };
 
 window.editors = {
   html: attachEditor(document.getElementById('editor-html'), document.getElementById('ln-html'), 'html', DEFAULT_CODE.html),
   css: attachEditor(document.getElementById('editor-css'), document.getElementById('ln-css'), 'css', DEFAULT_CODE.css),
   js: attachEditor(document.getElementById('editor-js'), document.getElementById('ln-js'), 'js', DEFAULT_CODE.js),
-  python: attachEditor(document.getElementById('editor-python'), document.getElementById('ln-python'), 'python', DEFAULT_CODE.python)
+  python: attachEditor(document.getElementById('editor-python'), document.getElementById('ln-python'), 'python', DEFAULT_CODE.python),
+  php: attachEditor(document.getElementById('editor-php'), document.getElementById('ln-php'), 'php', DEFAULT_CODE.php),
+  yaml: attachEditor(document.getElementById('editor-yaml'), document.getElementById('ln-yaml'), 'yaml', DEFAULT_CODE.yaml)
 };
 
 /* توابع خام رو هم قابل‌دسترس می‌ذاریم تا در صورت نیاز از script.js هم استفاده بشن */
 window.codeReformat = reformat;
+window.extractPhpCode = extractPhpCode;

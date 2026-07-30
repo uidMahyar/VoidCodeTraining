@@ -54,7 +54,13 @@
       <button class="rail-tab" data-lang="python">
         <span class="dot" id="dot-python"></span> Python
       </button>
-      <p class="rail-note">کلمات کلیدی و علائم نگارشی رنگی هستن. با «مرتب‌سازی» تورفتگی کد اصلاح می‌شه. بالای پنل خروجی رو بکش (یا ▲▼ رو بزن) تا فاصله عوض بشه.</p>
+      <button class="rail-tab" data-lang="php">
+        <span class="dot" id="dot-php"></span> PHP
+      </button>
+      <button class="rail-tab" data-lang="yaml">
+        <span class="dot" id="dot-yaml"></span> YAML
+      </button>
+      <p class="rail-note">کلمات کلیدی و علائم نگارشی رنگی هستن. با «مرتب‌سازی» تورفتگی کد اصلاح می‌شه. بالای پنل خروجی رو بکش (یا ▲▼ رو بزن) تا فاصله عوض بشه. PHP و YAML فقط از نظر نحوی بررسی می‌شن، اجرا/پیش‌نمایش واقعی ندارن.</p>
     </div>
 
     <div class="workspace">
@@ -87,6 +93,20 @@
             <div class="code-editor" id="editor-python"></div>
           </div>
         </div>
+
+        <div class="editor-pane" id="pane-php">
+          <div class="editor-wrap">
+            <div class="line-numbers" id="ln-php"></div>
+            <div class="code-editor" id="editor-php"></div>
+          </div>
+        </div>
+
+        <div class="editor-pane" id="pane-yaml">
+          <div class="editor-wrap">
+            <div class="line-numbers" id="ln-yaml"></div>
+            <div class="code-editor" id="editor-yaml"></div>
+          </div>
+        </div>
       </div>
 
       <div class="divider" id="divider">
@@ -107,6 +127,10 @@
           <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-modals allow-forms"></iframe>
           <div class="console-box" id="consoleBox"></div>
           <div class="error-list" id="errorList"></div>
+          <div class="success-box" id="successBox">
+            <span class="success-icon">🎉</span>
+            <p id="successMessage"></p>
+          </div>
         </div>
       </div>
 

@@ -6,13 +6,17 @@ var editorPanes = {
   html: document.getElementById('pane-html'),
   css: document.getElementById('pane-css'),
   js: document.getElementById('pane-js'),
-  python: document.getElementById('pane-python')
+  python: document.getElementById('pane-python'),
+  php: document.getElementById('pane-php'),
+  yaml: document.getElementById('pane-yaml')
 };
 var dots = {
   html: document.getElementById('dot-html'),
   css: document.getElementById('dot-css'),
   js: document.getElementById('dot-js'),
   python: document.getElementById('dot-python'),
+  php: document.getElementById('dot-php'),
+  yaml: document.getElementById('dot-yaml'),
   status: document.getElementById('dot-status')
 };
 var statusLabel = document.getElementById('statusLabel');
@@ -20,11 +24,15 @@ var placeholder = document.getElementById('placeholder');
 var previewFrame = document.getElementById('previewFrame');
 var consoleBox = document.getElementById('consoleBox');
 var errorList = document.getElementById('errorList');
+var successBox = document.getElementById('successBox');
+var successMessage = document.getElementById('successMessage');
 var openWindowBtn = document.getElementById('openWindowBtn');
 var runBtn = document.getElementById('runBtn');
 var cancelBtn = document.getElementById('cancelBtn');
 var formatBtn = document.getElementById('formatBtn');
 var divider = document.getElementById('divider');
+
+var WEB_LANGS = { html: 1, css: 1, js: 1 };
 
 var currentLang = 'html';
 var lastGoodWebDoc = null;
@@ -49,6 +57,12 @@ railTabs.forEach(function (tab) {
 
     syncOpenWindowBtn();
     updateCancelVisibility();
+
+    var yamlSelected = (currentLang === 'yaml');
+    formatBtn.disabled = yamlSelected;
+    formatBtn.title = yamlSelected
+      ? 'برای YAML مرتب‌سازی خودکار ارائه نمی‌شه، چون فاصله‌گذاری توی YAML معنی‌داره و ممکنه دستکاری خودکارش ساختار درست رو خراب کنه.'
+      : 'مرتب کردن کد';
   });
 });
 
@@ -157,6 +171,178 @@ function validateJS(code) {
 }
 
 /* ============================================================
+   اعتبارسنجی PHP: رشته‌ی نیمه‌کاره، سپس تعادل { } ( ) [ ]
+   (window.extractPhpCode از editor.js میاد)
+   ============================================================ */
+function findUnterminatedStringError(code) {
+  var state = null;
+  for (var i = 0; i < code.length; i++) {
+    var ch = code.charAt(i);
+    if (state === null) {
+      if (ch === '"' || ch === "'") state = ch;
+    } else {
+      if (ch === '\\') { i++; continue; }
+      if (ch === state) state = null;
+    }
+  }
+  if (state !== null) {
+    return 'یک رشته با ' + (state === '"' ? 'دابل‌کوتیشن (")' : 'سینگل‌کوتیشن (\')') + ' باز شده ولی تا آخر بسته نشده.';
+  }
+  return null;
+}
+
+function validatePHP(code) {
+  var phpCode = window.extractPhpCode(code);
+  if (!phpCode.trim()) {
+    return { ok: false, message: 'هیچ کد PHP‌ای پیدا نشد. کد باید داخل <?php ... ?> باشه.' };
+  }
+
+  var noComments = phpCode
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/#[^\n]*/g, '');
+
+  var stringError = findUnterminatedStringError(noComments);
+  if (stringError) return { ok: false, message: stringError };
+
+  var noStrings = noComments
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''");
+
+  var pairs = { '{': '}', '(': ')', '[': ']' };
+  var closers = { '}': '{', ')': '(', ']': '[' };
+  var stack = [];
+
+  for (var idx = 0; idx < noStrings.length; idx++) {
+    var ch = noStrings.charAt(idx);
+    if (pairs[ch]) {
+      stack.push(ch);
+    } else if (closers[ch]) {
+      var top = stack.pop();
+      if (top !== closers[ch]) {
+        return {
+          ok: false,
+          message: 'کاراکتر «' + ch + '» بدون جفت باز متناظرش پیدا شد؛ احتمالاً یک «' + closers[ch] + '» جا افتاده یا این یکی اضافه‌ست.'
+        };
+      }
+    }
+  }
+
+  if (stack.length > 0) {
+    var unclosed = stack[stack.length - 1];
+    return {
+      ok: false,
+      message: 'کاراکتر «' + unclosed + '» باز شده ولی تا آخر کد با «' + pairs[unclosed] + '» بسته نشده.'
+    };
+  }
+
+  return { ok: true };
+}
+
+/* ============================================================
+   اعتبارسنجی YAML: تب در تورفتگی، رشته نیمه‌کاره، تعادل [] {}،
+   و ناسازگاری سطح تورفتگی
+   ============================================================ */
+function getLineNumber(text, index) {
+  var count = 1;
+  for (var i = 0; i < index; i++) {
+    if (text.charAt(i) === '\n') count++;
+  }
+  return count;
+}
+
+function validateYAML(code) {
+  if (!code.trim()) {
+    return { ok: false, message: 'فایل YAML خالیه.' };
+  }
+
+  var lines = code.split('\n');
+
+  for (var li = 0; li < lines.length; li++) {
+    var leading = lines[li].match(/^[ \t]*/)[0];
+    if (leading.indexOf('\t') !== -1) {
+      return {
+        ok: false,
+        message: 'خط ' + (li + 1) + ': برای تورفتگی در YAML نباید از تب (Tab) استفاده کرد، فقط فاصله (space) مجازه.'
+      };
+    }
+  }
+
+  var noComments = lines.map(function (l) { return l.replace(/#.*$/, ''); }).join('\n');
+  var quoteState = null;
+  for (var i = 0; i < noComments.length; i++) {
+    var ch = noComments.charAt(i);
+    if (quoteState === null) {
+      if (ch === '"' || ch === "'") {
+        quoteState = { ch: ch, line: getLineNumber(noComments, i) };
+      }
+    } else {
+      if (ch === '\\' && quoteState.ch === '"') { i++; continue; }
+      if (ch === quoteState.ch) quoteState = null;
+      if (ch === '\n' && quoteState !== null) {
+        return {
+          ok: false,
+          message: 'خط ' + quoteState.line + ': یک رشته با ' + (quoteState.ch === '"' ? 'دابل‌کوتیشن' : 'سینگل‌کوتیشن') + ' باز شده ولی توی همون خط بسته نشده.'
+        };
+      }
+    }
+  }
+
+  var stripped = noComments
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''");
+  var pairs2 = { '[': ']', '{': '}' };
+  var closers2 = { ']': '[', '}': '{' };
+  var stack2 = [];
+  for (var j = 0; j < stripped.length; j++) {
+    var c = stripped.charAt(j);
+    if (pairs2[c]) stack2.push({ ch: c, line: getLineNumber(stripped, j) });
+    else if (closers2[c]) {
+      var top2 = stack2.pop();
+      if (!top2 || top2.ch !== closers2[c]) {
+        return {
+          ok: false,
+          message: 'خط ' + getLineNumber(stripped, j) + ': کاراکتر «' + c + '» بدون جفت باز متناظرش پیدا شد.'
+        };
+      }
+    }
+  }
+  if (stack2.length > 0) {
+    var unclosed2 = stack2[stack2.length - 1];
+    return {
+      ok: false,
+      message: 'خط ' + unclosed2.line + ': کاراکتر «' + unclosed2.ch + '» باز شده ولی بسته نشده.'
+    };
+  }
+
+  var indentStack = [0];
+  for (var k = 0; k < lines.length; k++) {
+    var raw = lines[k];
+    var trimmed = raw.trim();
+    if (trimmed === '' || trimmed.charAt(0) === '#') continue;
+
+    var indent = raw.match(/^[ ]*/)[0].length;
+    var current = indentStack[indentStack.length - 1];
+
+    if (indent > current) {
+      indentStack.push(indent);
+    } else if (indent < current) {
+      while (indentStack.length > 1 && indentStack[indentStack.length - 1] > indent) {
+        indentStack.pop();
+      }
+      if (indentStack[indentStack.length - 1] !== indent) {
+        return {
+          ok: false,
+          message: 'خط ' + (k + 1) + ': تورفتگی این خط (' + indent + ' فاصله) با هیچ‌کدوم از سطرهای قبلی هم‌تراز نیست — احتمالاً چند فاصله کم یا زیاد گذاشتی.'
+        };
+      }
+    }
+  }
+
+  return { ok: true };
+}
+
+/* ============================================================
    نمایش وضعیت‌های پنل خروجی
    ============================================================ */
 function hideAllOutputViews() {
@@ -164,6 +350,7 @@ function hideAllOutputViews() {
   previewFrame.style.display = 'none';
   consoleBox.style.display = 'none';
   errorList.style.display = 'none';
+  successBox.style.display = 'none';
 }
 
 function setDot(name, state) {
@@ -179,12 +366,22 @@ function setStatusLabel(text, state) {
 }
 
 function syncOpenWindowBtn() {
-  openWindowBtn.disabled = !(currentLang !== 'python' && lastGoodWebDoc);
+  openWindowBtn.disabled = !(WEB_LANGS[currentLang] && lastGoodWebDoc);
 }
 
 function updateCancelVisibility() {
-  var shouldShow = (currentLang === 'python') ? pythonIsPending : webIsLive;
+  var shouldShow = false;
+  if (currentLang === 'python') shouldShow = pythonIsPending;
+  else if (WEB_LANGS[currentLang]) shouldShow = webIsLive;
+  /* php/yaml: بررسی همیشه آنی و همزمانه، هیچ‌وقت چیزی برای لغو کردن نیست */
   cancelBtn.classList.toggle('visible', !!shouldShow);
+}
+
+function showSuccessView(message) {
+  hideAllOutputViews();
+  successBox.style.display = 'flex';
+  successMessage.textContent = message;
+  syncOpenWindowBtn();
 }
 
 function showPlaceholderView(html) {
@@ -464,10 +661,37 @@ function formatPython() {
 formatBtn.addEventListener('click', function () {
   if (currentLang === 'python') {
     formatPython();
+  } else if (currentLang === 'yaml') {
+    return;
   } else {
     formatWebLang(currentLang);
   }
 });
+
+/* ============================================================
+   بررسی مستقل PHP/YAML (بدون اجرای واقعی، فقط درستی نحوی)
+   ============================================================ */
+var STANDALONE_VALIDATORS = { php: validatePHP, yaml: validateYAML };
+var STANDALONE_LABELS = { php: 'PHP', yaml: 'YAML' };
+var SUCCESS_MESSAGES = {
+  php: '🎉 باریکلا! کد PHP رو درست نوشتی — هیچ ایراد نحوی‌ای توش نیست.',
+  yaml: '🎉 باریکلا! فایل YAML رو درست نوشتی — تورفتگی و ساختارش سالمه.'
+};
+
+function runStandaloneCheck(lang) {
+  var code = window.editors[lang].getCode();
+  var result = STANDALONE_VALIDATORS[lang](code);
+
+  setDot(lang, result.ok ? 'live' : 'trip');
+
+  if (result.ok) {
+    setStatusLabel('مدار وصله — همه‌چی درست کار می‌کنه', 'live');
+    showSuccessView(SUCCESS_MESSAGES[lang]);
+  } else {
+    setStatusLabel('قطعی توی مدار پیدا شد', 'trip');
+    showErrorsView([{ section: STANDALONE_LABELS[lang], message: 'اشتباه نوشتی: ' + result.message }]);
+  }
+}
 
 /* ============================================================
    دکمه‌های اجرا و لغو
@@ -475,6 +699,8 @@ formatBtn.addEventListener('click', function () {
 runBtn.addEventListener('click', function () {
   if (currentLang === 'python') {
     runPython();
+  } else if (currentLang === 'php' || currentLang === 'yaml') {
+    runStandaloneCheck(currentLang);
   } else {
     runWeb();
   }

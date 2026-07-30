@@ -26,6 +26,10 @@
   --tok-selector: #c792ea;
   --tok-atrule: #c792ea;
   --tok-hexcolor: #f0a868;
+  --tok-phptag: #ff8fa3;
+  --tok-variable: #56b6c2;
+  --tok-key: #82aaff;
+  --tok-anchor: #c792ea;
 }
 
 * { box-sizing: border-box; }
@@ -143,6 +147,8 @@ button, input, textarea { font-family: inherit; }
 
 .format-btn:hover { color: var(--text); border-color: var(--accent-dim); }
 .format-btn:active { transform: translateY(1px); }
+.format-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.format-btn:disabled:hover { color: var(--text-dim); border-color: var(--border); }
 
 /* ===== Layout: rail + workspace ===== */
 .layout {
@@ -288,6 +294,10 @@ button, input, textarea { font-family: inherit; }
 .tok-selector { color: var(--tok-selector); font-weight: 600; }
 .tok-atrule { color: var(--tok-atrule); font-weight: 600; }
 .tok-hexcolor { color: var(--tok-hexcolor); }
+.tok-phptag { color: var(--tok-phptag); font-weight: 700; }
+.tok-variable { color: var(--tok-variable); }
+.tok-key { color: var(--tok-key); font-weight: 600; }
+.tok-anchor { color: var(--tok-anchor); }
 
 /* ===== Divider (draggable resize handle + tap-to-step buttons) ===== */
 .divider {
@@ -429,6 +439,31 @@ button, input, textarea { font-family: inherit; }
   color: var(--text-dim);
   font-size: 13px;
   line-height: 2;
+}
+
+.success-box {
+  height: 100%;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+.success-box .success-icon {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.success-box p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--live);
+  max-width: 420px;
+  line-height: 1.9;
 }
 
 .placeholder strong { color: var(--text); }

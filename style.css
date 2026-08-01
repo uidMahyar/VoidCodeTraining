@@ -150,7 +150,128 @@ button, input, textarea { font-family: inherit; }
 .format-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .format-btn:disabled:hover { color: var(--text-dim); border-color: var(--border); }
 
-/* ===== Layout: rail + workspace ===== */
+.hamburger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.hamburger-btn:hover { color: var(--text); border-color: var(--accent-dim); }
+
+.current-lang-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel-inset);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.current-lang-btn:hover { border-color: var(--accent-dim); }
+
+/* ===== Drawer (کشوی کناری) ===== */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 40;
+}
+
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(300px, 82vw);
+  height: 100%;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+.drawer.open { transform: translateX(0); }
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  flex-shrink: 0;
+}
+
+.drawer-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.drawer-close-btn:hover { color: var(--text); }
+
+.drawer-section {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.drawer-section-title {
+  margin: 0;
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.drawer-placeholder {
+  margin: 0;
+  padding: 8px 16px 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.8;
+}
+
+.drawer-note {
+  margin: auto 0 0;
+  padding: 16px 16px 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  border-top: 1px solid var(--border);
+}
+
+/* ===== Layout: workspace ===== */
 .layout {
   flex: 1;
   display: flex;
@@ -158,20 +279,11 @@ button, input, textarea { font-family: inherit; }
   overflow: hidden;
 }
 
-.rail {
-  display: flex;
-  flex-direction: column;
-  background: var(--panel);
-  border-left: 1px solid var(--border);
-  width: 168px;
-  flex-shrink: 0;
-  padding: 10px 0;
-}
-
 .rail-tab {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 11px 16px;
   background: transparent;
   border: none;
@@ -204,14 +316,6 @@ button, input, textarea { font-family: inherit; }
 
 .dot.live { background: var(--live); box-shadow: 0 0 6px rgba(61,220,132,0.7); }
 .dot.trip { background: var(--trip); box-shadow: 0 0 6px rgba(255,92,92,0.7); }
-
-.rail-note {
-  margin-top: auto;
-  padding: 12px 16px 4px;
-  font-size: 11px;
-  color: var(--text-dim);
-  line-height: 1.8;
-}
 
 /* ===== Workspace ===== */
 .workspace {
@@ -522,24 +626,9 @@ button, input, textarea { font-family: inherit; }
 
 /* ===== Responsive ===== */
 @media (max-width: 720px) {
-  .layout { flex-direction: column; }
-  .rail {
-    flex-direction: row;
-    width: 100%;
-    border-left: none;
-    border-bottom: 1px solid var(--border);
-    padding: 6px 8px;
-    overflow-x: auto;
-  }
-  .rail-tab {
-    border-right: none;
-    border-bottom: 2px solid transparent;
-    padding: 8px 12px;
-    white-space: nowrap;
-  }
-  .rail-tab.active { border-bottom: 2px solid var(--accent); }
-  .rail-note { display: none; }
   .output-region { flex-basis: 46%; }
   .brand h1 { display: none; }
+  .brand { gap: 8px; }
   .format-btn span, .format-btn { font-size: 12px; padding: 8px 12px; }
+  .current-lang-btn { font-size: 11.5px; padding: 5px 9px; }
 }

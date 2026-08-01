@@ -17,6 +17,7 @@ var dots = {
   python: document.getElementById('dot-python'),
   php: document.getElementById('dot-php'),
   yaml: document.getElementById('dot-yaml'),
+  current: document.getElementById('dot-current'),
   status: document.getElementById('dot-status')
 };
 var statusLabel = document.getElementById('statusLabel');
@@ -44,6 +45,36 @@ var DEFAULT_PLACEHOLDER_HTML = 'کد رو بنویس، بعد دکمه <strong>�
 var CANCELLED_PLACEHOLDER_HTML = 'اجرا لغو شد. کد جدید رو بنویس و دوباره <strong>▶ اجرا</strong> رو بزن.';
 
 /* ============================================================
+   کشوی کناری (باز/بسته شدن)
+   ============================================================ */
+var drawer = document.getElementById('drawer');
+var drawerOverlay = document.getElementById('drawerOverlay');
+var hamburgerBtn = document.getElementById('hamburgerBtn');
+var drawerCloseBtn = document.getElementById('drawerCloseBtn');
+var currentLangBtn = document.getElementById('currentLangBtn');
+var currentLangText = document.getElementById('currentLangText');
+
+var LANG_LABELS = { html: 'HTML', css: 'CSS', js: 'JavaScript', python: 'Python', php: 'PHP', yaml: 'YAML' };
+
+function openDrawer() {
+  drawer.classList.add('open');
+  drawerOverlay.classList.add('open');
+}
+
+function closeDrawer() {
+  drawer.classList.remove('open');
+  drawerOverlay.classList.remove('open');
+}
+
+hamburgerBtn.addEventListener('click', openDrawer);
+currentLangBtn.addEventListener('click', openDrawer);
+drawerCloseBtn.addEventListener('click', closeDrawer);
+drawerOverlay.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeDrawer();
+});
+
+/* ============================================================
    تعویض تب‌ها
    ============================================================ */
 railTabs.forEach(function (tab) {
@@ -55,6 +86,12 @@ railTabs.forEach(function (tab) {
     currentLang = tab.dataset.lang;
     editorPanes[currentLang].classList.add('active');
 
+    currentLangText.textContent = LANG_LABELS[currentLang] || currentLang;
+    setDot('current', null);
+    var currentTabDot = document.getElementById('dot-' + currentLang);
+    if (currentTabDot && currentTabDot.classList.contains('live')) setDot('current', 'live');
+    if (currentTabDot && currentTabDot.classList.contains('trip')) setDot('current', 'trip');
+
     syncOpenWindowBtn();
     updateCancelVisibility();
 
@@ -63,6 +100,8 @@ railTabs.forEach(function (tab) {
     formatBtn.title = yamlSelected
       ? 'برای YAML مرتب‌سازی خودکار ارائه نمی‌شه، چون فاصله‌گذاری توی YAML معنی‌داره و ممکنه دستکاری خودکارش ساختار درست رو خراب کنه.'
       : 'مرتب کردن کد';
+
+    closeDrawer();
   });
 });
 
@@ -251,6 +290,22 @@ function getLineNumber(text, index) {
   return count;
 }
 
+/* آیا این خط (بدون کامنت/فاصله‌ی اضافه) یک شکل معتبر YAML داره؟
+   - آیتم لیست: با "-" شروع شده (بعدش هرچی باشه مجازه: مقدار ساده یا کلید)
+   - کلید نگاشت: باید یک ":" واقعی (بیرون از رشته) داشته باشه
+   - علائم سند --- و ... همیشه مجازن */
+function isValidYamlLineShape(trimmedNoComment) {
+  var t = trimmedNoComment;
+  if (t === '' || t === '---' || t === '...') return true;
+
+  if (t === '-' || /^-\s/.test(t)) return true; // آیتم لیست
+
+  var stripped = t
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''");
+  return /:(\s|$)/.test(stripped);
+}
+
 function validateYAML(code) {
   if (!code.trim()) {
     return { ok: false, message: 'فایل YAML خالیه.' };
@@ -316,6 +371,7 @@ function validateYAML(code) {
   }
 
   var indentStack = [0];
+  var noCommentLines = noComments.split('\n');
   for (var k = 0; k < lines.length; k++) {
     var raw = lines[k];
     var trimmed = raw.trim();
@@ -336,6 +392,16 @@ function validateYAML(code) {
           message: 'خط ' + (k + 1) + ': تورفتگی این خط (' + indent + ' فاصله) با هیچ‌کدوم از سطرهای قبلی هم‌تراز نیست — احتمالاً چند فاصله کم یا زیاد گذاشتی.'
         };
       }
+    }
+
+    /* بررسی خودِ ساختار خط: یا آیتم لیست باشه، یا یک کلید معتبر
+       با ":" داشته باشه — قبلاً این بررسی اصلاً وجود نداشت. */
+    var contentNoComment = noCommentLines[k].trim();
+    if (!isValidYamlLineShape(contentNoComment)) {
+      return {
+        ok: false,
+        message: 'خط ' + (k + 1) + ': این خط نه با «-» شروع شده نه یک «:» داره. توی YAML هر خط یا باید «کلید: مقدار» باشه یا با «-» یک آیتم لیست بسازه.'
+      };
     }
   }
 
@@ -358,6 +424,11 @@ function setDot(name, state) {
   if (!el) return;
   el.classList.remove('live', 'trip');
   if (state === 'live' || state === 'trip') el.classList.add(state);
+
+  if (name === currentLang && dots.current) {
+    dots.current.classList.remove('live', 'trip');
+    if (state === 'live' || state === 'trip') dots.current.classList.add(state);
+  }
 }
 
 function setStatusLabel(text, state) {

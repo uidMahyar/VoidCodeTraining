@@ -14,6 +14,9 @@
 
   <div class="topbar">
     <div class="brand">
+      <button class="hamburger-btn" id="hamburgerBtn" aria-label="باز کردن منو">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <svg width="26" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="4" cy="16" r="2.5" stroke="#e8a33d" stroke-width="2"/>
         <circle cx="28" cy="16" r="2.5" stroke="#e8a33d" stroke-width="2"/>
@@ -22,6 +25,10 @@
         <line x1="14" y1="16" x2="24" y2="6" stroke="#e8a33d" stroke-width="2" stroke-linecap="round"/>
       </svg>
       <h1>مدار کد</h1>
+      <button class="current-lang-btn" id="currentLangBtn">
+        <span class="dot" id="dot-current"></span>
+        <span id="currentLangText">HTML</span>
+      </button>
     </div>
     <div class="actions">
       <button class="cancel-btn" id="cancelBtn">
@@ -39,9 +46,23 @@
     </div>
   </div>
 
-  <div class="layout">
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <svg width="24" height="18" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="4" cy="16" r="2.5" stroke="#e8a33d" stroke-width="2"/>
+        <circle cx="28" cy="16" r="2.5" stroke="#e8a33d" stroke-width="2"/>
+        <line x1="6.5" y1="16" x2="14" y2="16" stroke="#e8a33d" stroke-width="2"/>
+        <line x1="22" y1="16" x2="25.5" y2="16" stroke="#e8a33d" stroke-width="2"/>
+        <line x1="14" y1="16" x2="24" y2="6" stroke="#e8a33d" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <button class="drawer-close-btn" id="drawerCloseBtn" aria-label="بستن منو">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
 
-    <div class="rail" id="rail">
+    <div class="drawer-section">
+      <p class="drawer-section-title">زبان‌ها</p>
       <button class="rail-tab active" data-lang="html">
         <span class="dot" id="dot-html"></span> HTML
       </button>
@@ -60,8 +81,22 @@
       <button class="rail-tab" data-lang="yaml">
         <span class="dot" id="dot-yaml"></span> YAML
       </button>
-      <p class="rail-note">کلمات کلیدی و علائم نگارشی رنگی هستن. با «مرتب‌سازی» تورفتگی کد اصلاح می‌شه. بالای پنل خروجی رو بکش (یا ▲▼ رو بزن) تا فاصله عوض بشه. PHP و YAML فقط از نظر نحوی بررسی می‌شن، اجرا/پیش‌نمایش واقعی ندارن.</p>
     </div>
+
+    <div class="drawer-section">
+      <p class="drawer-section-title">ظاهر</p>
+      <p class="drawer-placeholder">به‌زودی: تغییر بین حالت روشن و تیره</p>
+    </div>
+
+    <div class="drawer-section">
+      <p class="drawer-section-title">تنظیمات</p>
+      <p class="drawer-placeholder">به‌زودی: تغییر اندازه‌ی فونت ادیتور</p>
+    </div>
+
+    <p class="drawer-note">کلمات کلیدی و علائم نگارشی رنگی هستن. با «مرتب‌سازی» تورفتگی کد اصلاح می‌شه. بالای پنل خروجی رو بکش (یا ▲▼ رو بزن) تا فاصله عوض بشه. PHP و YAML فقط از نظر نحوی بررسی می‌شن، اجرا/پیش‌نمایش واقعی ندارن.</p>
+  </div>
+
+  <div class="layout">
 
     <div class="workspace">
 

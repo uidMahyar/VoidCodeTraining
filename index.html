@@ -8,6 +8,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>
+(function () {
+  try {
+    if (localStorage.getItem('circuitPlaygroundTheme') === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <div class="app">
@@ -31,10 +40,6 @@
       </button>
     </div>
     <div class="actions">
-      <button class="cancel-btn" id="cancelBtn">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
-        لغو اجرا
-      </button>
       <button class="format-btn" id="formatBtn" title="مرتب کردن کد">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="17" y2="18"/></svg>
         مرتب‌سازی
@@ -75,17 +80,14 @@
       <button class="rail-tab" data-lang="python">
         <span class="dot" id="dot-python"></span> Python
       </button>
-      <button class="rail-tab" data-lang="php">
-        <span class="dot" id="dot-php"></span> PHP
-      </button>
-      <button class="rail-tab" data-lang="yaml">
-        <span class="dot" id="dot-yaml"></span> YAML
-      </button>
     </div>
 
     <div class="drawer-section">
       <p class="drawer-section-title">ظاهر</p>
-      <p class="drawer-placeholder">به‌زودی: تغییر بین حالت روشن و تیره</p>
+      <div class="theme-toggle" id="themeToggle">
+        <button class="theme-toggle-btn" data-theme="dark" type="button">🌙 تیره</button>
+        <button class="theme-toggle-btn" data-theme="light" type="button">☀️ روشن</button>
+      </div>
     </div>
 
     <div class="drawer-section">
@@ -93,7 +95,7 @@
       <p class="drawer-placeholder">به‌زودی: تغییر اندازه‌ی فونت ادیتور</p>
     </div>
 
-    <p class="drawer-note">کلمات کلیدی و علائم نگارشی رنگی هستن. با «مرتب‌سازی» تورفتگی کد اصلاح می‌شه. بالای پنل خروجی رو بکش (یا ▲▼ رو بزن) تا فاصله عوض بشه. PHP و YAML فقط از نظر نحوی بررسی می‌شن، اجرا/پیش‌نمایش واقعی ندارن.</p>
+    <p class="drawer-note">کلمات کلیدی و علائم نگارشی رنگی هستن. با «مرتب‌سازی» تورفتگی کد اصلاح می‌شه. بالای پنل خروجی رو بکش (یا ▲▼ رو بزن) تا فاصله عوض بشه.</p>
   </div>
 
   <div class="layout">
@@ -128,20 +130,6 @@
             <div class="code-editor" id="editor-python"></div>
           </div>
         </div>
-
-        <div class="editor-pane" id="pane-php">
-          <div class="editor-wrap">
-            <div class="line-numbers" id="ln-php"></div>
-            <div class="code-editor" id="editor-php"></div>
-          </div>
-        </div>
-
-        <div class="editor-pane" id="pane-yaml">
-          <div class="editor-wrap">
-            <div class="line-numbers" id="ln-yaml"></div>
-            <div class="code-editor" id="editor-yaml"></div>
-          </div>
-        </div>
       </div>
 
       <div class="divider" id="divider">
@@ -155,17 +143,19 @@
           <span class="status-label" id="statusLabel">
             <span class="dot" id="dot-status"></span> آماده — هنوز اجرا نشده
           </span>
-          <button class="icon-btn" id="openWindowBtn" disabled>باز کردن در پنجره جدید</button>
+          <div class="output-header-actions">
+            <button class="cancel-btn" id="cancelBtn">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+              لغو اجرا
+            </button>
+            <button class="icon-btn" id="openWindowBtn" disabled>باز کردن در پنجره جدید</button>
+          </div>
         </div>
         <div class="output-body">
           <div class="placeholder" id="placeholder"></div>
           <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-modals allow-forms"></iframe>
           <div class="console-box" id="consoleBox"></div>
           <div class="error-list" id="errorList"></div>
-          <div class="success-box" id="successBox">
-            <span class="success-icon">🎉</span>
-            <p id="successMessage"></p>
-          </div>
         </div>
       </div>
 
